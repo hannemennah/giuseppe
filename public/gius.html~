@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="jquery-ui.css">
+    <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+
+
+    <style>
+        html,
+        body {
+            height: 100%;
+            font-family: "Trebuchet MS", "Open Sans", Segoe UI light, Verdana, Tahoma, Helvetica, sans-serif;
+            font-size: 15px;
+            margin: 0;
+            padding: 0;
+            background: #fff;
+        }
+        #acro {
+            font-size: 200%;
+            color:  green;
+        }
+        #titlebar {
+            margin-left: 20px;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 20px;
+        }
+        #content {
+          width:100%;
+          height: 90%;
+        }
+        #chart {
+            height: 80%;
+            position: absolute;
+            width: -moz-calc(80% - 45px);
+            width: -webkit-calc(80% - 45px);
+            width: calc(80% - 45px);
+        }
+        #changeAlert {
+            width: 320px;
+            font-size: 12px;
+            white-space: normal;
+        }
+        input[type="text"]
+        {
+            font-size:16px;
+            font-weight: bold;
+            text-align: center;
+        }
+        #txTxt
+        {
+            position:absolute;
+            bottom:0;
+            width:98.5%;
+            height: 300px;
+            margin-left: 6px;
+            margin-right: 5px;
+        }
+        textarea
+        {
+            position:relative;
+            margin-left: 6px;
+            border:1px solid #999999;
+            width:98.5%;
+            height: 230px;
+            bottom:0;
+        }
+        .boxsizingBorder {
+            -webkit-box-sizing: border-box;
+               -moz-box-sizing: border-box;
+                    box-sizing: border-box;
+        }
+        #add-input img, #changeButton img, #sendTx img, #gear img, #signTx img{
+            display: block;
+            height: 50px;  
+            width: 50px;
+        }
+
+        .svg-container {
+            display: inline-block;
+            position: relative;
+            width: 90%;
+            padding-bottom: 10%; /* aspect ratio */
+            vertical-align: top;
+            overflow: hidden;
+        }
+        .svg-content-responsive {
+            display: inline-block;
+            position: absolute;
+            top: 10px;
+            left: 0;
+        }
+
+    .ui-dialog .ui-state-error { padding: .3em; }
+            .validateTips { border: 1px solid transparent; padding: 0.1em; }
+
+        /*body { font-size: 62.5%; }*/
+        label, input { display:block; }
+        input.text { margin-bottom:12px; width:97%; padding: .4em; }
+        fieldset { padding:0; border:0; margin-top:25px; }
+        h1 { font-size: 1.2em; margin: .6em 0; }
+        div#users-contain { width: 350px; margin: 20px 0; }
+        div#users-contain table { margin: 1em 0; border-collapse: collapse; width: 100%; }
+        div#users-contain table td, div#users-contain table th { border: 1px solid #eee; padding: .6em 10px; text-align: left; }
+        .ui-dialog .ui-state-error { padding: .3em; }
+        .validateTips { border: 1px solid transparent; padding: 0.3em; }
+
+
+
+    .d3-tip {
+      line-height: 1;
+      font-weight: bold;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      border-radius: 2px;
+    }
+
+    /* Creates a small triangle extender for the tooltip */
+    .d3-tip:after {
+      box-sizing: border-box;
+      display: inline;
+      font-size: 10px;
+      width: 100%;
+      line-height: 1;
+      color: rgba(0, 0, 0, 0.8);
+      content: "\25BC";
+      position: absolute;
+      text-align: center;
+    }
+
+    /* Style northward tooltips differently */
+    .d3-tip.n:after {
+      margin: -1px 0 0 0;
+      top: 100%;
+      left: 0;
+    }
+    </style>
+    <title>GIUSEPPE</title>
+    <script src="d3.cluster.min.js"></script>
+    <script src="d3.tip.v0.6.3.js"></script>
+    <script src="http://localhost:1234/socket.io/socket.io.js"></script>
+    <script src="jquery-2.1.4.min.js"></script>
+    <script>
+        var readable = true;
+        var socket = io.connect('http://localhost:1234');
+                socket.on('connect',function(){
+                    console.log("connect");
+                });
+
+        //Fire this on page startup (creates app-generated change address+keys)
+        window.onload = function() {
+            socket.emit('pageLoad');
+        }   
+
+        //Attempt to add Origin Address
+        function inputAdd() {
+                var inputAddress = prompt("Please enter origin address", "");
+                if (inputAddress != null) {
+                    socket.emit('addNewAddress', inputAddress, "origin");
+               }
+        }
+
+        //Use app-generated public/private keypair for change address
+        //  CAUTION: takes a while to import private key
+        function usePageChange() {
+                socket.emit('usePageChange');
+                document.getElementById("changeButton").disabled = true;
+                document.getElementById("changeAddInput").disabled = true;
+        }
+
+        //Toggle magicTextBox viewmode (view built transaction, raw transaction, or decoded transaction)
+        function gearShift() {
+            var currBoxText = document.getElementById("txtBox").value;
+            if((readable && currBoxText.indexOf("locktime") > -1) || (currBoxText.length < 1)){
+                doMagic();
+                readable = false;
+            } else {
+                socket.emit('toggle', readable, currBoxText);
+            }
+            readable = !readable;
+        }
+
+        //This fires when a new origin address has been validated
+        socket.on('validNewOriginAddress',function(address, unspents, doIOwn){
+                var unspentAmount = 0.0;
+                unspents.forEach(function(unspent) {
+                          unspentAmount += parseFloat(unspent.value);
+                        });
+                //Make sure the address is /only/ an origin address
+                if(idxOfAttr(nodes, 'address', address) < 0){
+                        if(unspentAmount <= 0.0) {
+                            document.getElementById("txtBox").value = "ORIGIN ADDRESS EMPTY";
+                            return;
+                        } else {
+                            addnode(address, 'origin', unspentAmount, doIOwn);
+                            document.getElementById("add-input").disabled = true;
+                        }
+                }
+                else {
+                    document.getElementById("txtBox").value = "ADDRESS ALREADY USED";
+                }
+        });
+
+        //This fires when a new recipient address has been validated
+        socket.on('validNewRecipientAddress',function(address, unspents, doIOwn, parentNID, receiveAmount){
+            receiveAmount = receiveAmount || 0.00;
+            if(idxOfAttr(nodes, 'address', address) < 0){
+                //address did not exist in our chart already
+                var unspentAmount = 0.0;
+                unspents.forEach(function(unspent) {
+                          unspentAmount += parseFloat(unspent.value);
+                        });
+               addnode(address, 'recipient', 0, doIOwn, parentNID);
+               receipt(address, parentNID, receiveAmount.toString());
+            }
+            else {
+               //address already existed; don't add a new node (just add to existing one)
+               receipt(address, parentNID, receiveAmount);
+            }
+        });
+
+
+        socket.on('freshChange',function(address, doIOwn){
+            var idxOfExistingChange = idxOfAttr(nodes, 'type', 'change');
+            if(idxOfAttr(nodes, 'address', address) < 0 || idxOfAttr(nodes, 'address', address) === idxOfExistingChange){
+                if(doIOwn) {
+                    document.getElementById("changeAddInput").style.backgroundColor = "lightgreen";
+                    document.getElementById("changeAlert").style.visibility = "hidden";
+                } else {
+                    document.getElementById("changeAddInput").style.backgroundColor = "pink";
+                    document.getElementById("changeAlert").style.visibility = "visible";
+                }
+
+                document.getElementById('changeAddInput').value = address;
+                oldChangeAddress = address;
+                updateChangeNode(address, doIOwn, function(alreadyExisted) {
+                    if(!alreadyExisted) addnode(address, "change", 0, Boolean(doIOwn));
+                });
+            } else {
+                console.log("Already using that address.");
+                document.getElementById('changeAddInput').value = oldChangeAddress;
+            }
+            doMagic();
+        });
+
+        socket.on('magicText',function(incomingText){
+            document.getElementById("txtBox").value = incomingText;
+        });
+
+    $(function() {
+        var dialog, form,
+     
+          recipientAddress = $( "#recipientAddress" ),
+          amountToSend = $( "#sendAmount" ),
+          allFields = $( [] ).add( recipientAddress ).add( amountToSend ),
+          tips = $( ".validateTips" );
+     
+        function updateTips( t ) {
+          tips
+            .text( t )
+            .addClass( "ui-state-highlight" );
+          setTimeout(function() {
+            tips.removeClass( "ui-state-highlight", 1500 );
+          }, 500 );
+        }
+     
+        function checkLength( o, n, min, max ) {
+          if ( o.val().length > max || o.val().length < min ) {
+            o.addClass( "ui-state-error" );
+            updateTips( "Please make sure 'Recipient Address' is a valid Bitcoin address." );
+            return false;
+          } else {
+            return true;
+          }
+        }
+     
+        function checkRegexp( o, regexp, n ) {
+          if ( !( regexp.test( o.val() ) ) ) {
+            o.addClass( "ui-state-error" );
+            updateTips( n );
+            return false;
+          } else {
+            return true;
+          }
+        }
+     
+        function createRecipient() {
+          var valid = true;
+          var parentNID = parseFloat($("#dialog-form").data('nid'));
+          allFields.removeClass( "ui-state-error" );
+     
+          valid = valid && checkLength( recipientAddress, "Recipient Address", 26, 35 );
+
+          if ( valid ) {
+            socket.emit('addNewAddress', recipientAddress.val(), "recipient", parentNID, parseFloat(amountToSend.val()));
+
+            dialog.dialog( "close" );
+            doMagic();
+          }
+          return valid;
+        }
+
+        function createRecipientPlus() {
+          createRecipient();
+          totalNodeUnspent(currentSpender.address, function(i){
+          $( "#dialog-form" ).dialog('option', 'title', ("Direct coinflow for " + currentSpender.address.toString()) )
+                    .data('addressTotal', i)
+                    .data('nid', currentSpender.nodeID)
+                    .dialog('open');
+          $( "#dialog-form" ).dialog('open');
+          });
+        }
+          
+
+
+        dialog = $( "#dialog-form" ).dialog({
+          autoOpen: false,
+          height: 480,
+          width: 570,
+          modal: true,
+          buttons: {
+            "Add another recipient": createRecipientPlus,
+            "Done": createRecipient,
+            Cancel: function() {
+              dialog.dialog( "close" );
+            }
+          },
+          close: function() {
+            form[ 0 ].reset();
+            allFields.removeClass( "ui-state-error" );
+          }
+        });
+     
+        form = dialog.find( "form" ).on( "submit", function( event ) {
+          event.preventDefault();
+          createRecipient();
+        });
+     
+      });
+
+        var alreadyCollectedFee = 0.0;
+
+        function idxOfAttr(array, attr, value) {
+            for(var i = 0; i < array.length; i += 1) {
+                if(array[i][attr] === value) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function updateChange() {
+            var tryChange = document.getElementById('changeAddInput').value;
+            socket.emit('newChangeAddress', tryChange);
+        }
+
+        function controlFee() {
+            var tryFee = Math.abs(parseFloat(document.getElementById('feeInput').value));
+            if(isNaN(tryFee)) {
+               alert(document.getElementById('feeInput').value + " is not a number, please enter a different fee value.");
+               document.getElementById('feeInput').value = alreadyCollectedFee.toString();
+            } else {
+                howMuchTotalAvailable(function(i) {
+                    if(tryFee > i) {
+                       alert(tryFee.toString() + " is more than the total number of UTXO available, please enter a different fee value.");
+                       document.getElementById('feeInput').value = alreadyCollectedFee.toString();
+                    } else {
+                        alreadyCollectedFee = tryFee;
+                    }
+                });
+            }
+            doMagic();
+        }
+
+
+        function howMuchTotalAvailable(callback) {
+            var tally = 0.0;
+            for (i = 0; i < nodes.length; i++) {
+                if(nodes[i].type === 'origin') {
+                    tally += parseFloat(nodes[i].utxo);
+                }
+            }
+            callback(tally);
+        }
+
+        function updateWhatsLeft() {
+           var totalAvailable = parseFloat($("#dialog-form").data('addressTotal'));
+           var payAttempt = parseFloat(document.getElementById("sendAmount").value);
+
+           if(payAttempt > 0.00 && totalAvailable >= payAttempt) {
+                $("#remainingUTXO").text((totalAvailable - payAttempt).toFixed(8));
+           } else {
+                $("#remainingUTXO").text((totalAvailable).toFixed(8));
+                document.getElementById("sendAmount").value = "0.00"
+           }
+
+        }
+
+
+        function doMagic() {
+           socket.emit('magicUpdate', nodes, parseFloat(document.getElementById('feeInput').value));
+        }
+
+    </script>
+    <script src="jquery-ui.js"></script>
+
+</head>
+<body>
+
+    <div id="dialog-form" title="Direct coinflow">
+
+      <p class="validateTips">All form fields are required.</p>
+     
+      <form>
+        <fieldset>
+          <label for="recipientAddress">Recipient Address:</label>
+          <input type="text" name="recipientAddress" id="recipientAddress" value="" class="text ui-widget-content ui-corner-all">
+          <label for="sendAmount">Amount To Send:</label>
+          <input type="text" name="sendAmount" id="sendAmount" value="0.00" class="text ui-widget-content ui-corner-all" oninput="updateWhatsLeft()">
+
+     
+          <!-- Allow form submission with keyboard without duplicating the dialog button -->
+          <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
+        </fieldset>
+      </form>
+
+      <br><br>
+      <div><label>Still left to spend:</label><br><div id="remainingUTXO"></div></div>
+    </div>
+
+
+    <!--TITLELBAR-->
+
+    <div id="titlebar">
+        <span id="titletext" class="pagetitle"><span id="acro">g</span>raphical <span id="acro">i</span>nterface for <span id="acro">u</span>txo <span id="acro">s</span>ignature <span id="acro">e</span>vents: <span id="acro">p</span>roduction, <span id="acro">p</span>ortrayal, and <span id="acro">e</span>mission</span>
+    </div>
+	
+	
+	<!--PAGE WRAPPER-->
+
+    <div id="content">
+	    <!--CHART-->
+        <div id="chart"></div>
+	    <!--CONTROLS-->
+
+		<div style="display:block;overflow: hidden;white-space: nowrap; float: right; font-size: 25px; padding-right: 20px;">
+            <div align="center">Origin Address:<br>
+               <button id="add-input" title="Add Sender Address" onclick="inputAdd();"><img src="/images/outbit.png" style="float:right;"></button>
+                </div>
+                <br><br>
+                <div align="center">Change Address:<input id="changeAddInput" type="text" value="" onchange="updateChange()" onClick="this.select();" style="background-color:pink" maxlength="35" size="35"/>
+                    <div id="changeAlert">WARNING: you may not control this change address. <br>(You can click the delta button to import the random address into your wallet.)</div><br>
+                    <button id="changeButton" title="Import+Use App-Generated Change Address" onclick="usePageChange();"><img src="/images/delta.png" style="float:right;"></button></div>
+        		<br><div align="center">Fee:<input id="feeInput" type="text" value="0.00" onchange="controlFee()"/></div>
+                <br>
+                <div align="center"><button id="gear" title="Toggle Display" onclick="gearShift();"><img src="/images/gear.png" style="float:right;"></button><button id="signTx" title="Sign Transaction" onclick="signTx();"><img src="/images/sign.png" style="float:right;"></button><button id="sendTx" title="Send Transaction"  onclick="sendTx();"><img src="/images/arrow-right.png" style="float:right;"></button><br></div>
+       </div>
+
+       <textarea id="txtBox" type="text" value="" rows="100" cols="200" text-align=left></textarea>
+
+<script src="d3stuff.js"></script>
+</body>
