@@ -6,11 +6,11 @@ var express = require("express"),
     bodyParser = require('body-parser'),
     errorHandler = require('errorhandler'),
     hostname = process.env.HOSTNAME || 'localhost',
-    port = parseInt(process.env.PORT, 10) || 1234,
     bitcoin = require('bitcoinjs-lib')
     API = require('cb-blockr'),
     child_process = require('child_process'),
     publicDir = __dirname + '/public',
+    port = parseInt(process.env.PORT, 10) || 1234,
     bitcoinCommandPath = '/home/example/bitcoin-0.10.2/bin/bitcoin-cli ',
     whichNetworkToUse = 'testnet';
 
