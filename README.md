@@ -17,8 +17,9 @@ From the root directory, run:
 
     sudo npm install 
 
-Once the required Node.JS modules have been successfully installed, modify app.js and update the bitcoinCommandPath to your bitcoin-cli binary and whether to use the testnet or mainnet:
+Once the required Node.JS modules have been successfully installed, modify app.js and update the port to your desired application port (default is 1234), the bitcoinCommandPath to your bitcoin-cli binary, and whether to use the testnet or mainnet:
 
+    port = parseInt(process.env.PORT, 10) || 1234,
     bitcoinCommandPath = '/home/example/bitcoin-0.10.2/bin/bitcoin-cli ',
     whichNetworkToUse = 'testnet';
   
