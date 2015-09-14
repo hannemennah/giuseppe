@@ -7,7 +7,7 @@ graphical interface for utxo signature events: production, portrayal, and emissi
 Manual Transaction Creation Assistant
 --------------
 
-A tool to assist in constructing and visualizing manual transactions. As parameters of the transaction are specified, the corresponding transaction hash is generated and updated dynamically. The transaction is depicted in a chart, built in d3.js and updated in real-time. 
+A tool to assist in constructing and visualizing manual transactions. As parameters of the transaction are specified, the corresponding transaction hash is generated and updated dynamically. The transaction is also depicted in a chart, built in d3.js and updated in real-time. 
 
 **The app requires a local instance of bitcoind to be running**, and provides the option to sign and send the constructed transactions once they are complete. 
 
