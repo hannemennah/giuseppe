@@ -157,7 +157,7 @@ io.on('connection', function (socket) {
         child_process.exec((bitcoinCommandPath + 'sendrawtransaction ' + 
                                     text), function(error, stdout, stderr){
                 myOutput = stdout;
-                socket.emit('magicText', "TRANSACTION SENT TO NETWORK");
+                socket.emit('magicText', ("TRANSACTION SENT TO NETWORK: " + text);
                 });
     });
 
