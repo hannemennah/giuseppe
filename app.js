@@ -103,7 +103,23 @@ io.on('connection', function (socket) {
     });
 
     socket.on('tryToMatchPrivate', function(address, allegedPrivateKey){
-        console.log("STILL TODO - VALIDATE");
+        try {
+	      var attemptKeyPair = bitcoin.ECKey.fromWIF(allegedPrivateKey, bitcoin.networks.testnet);
+          } catch (e) {
+	        socket.emit('magicText', 'Not a real private key!');
+            return false;
+          }
+        if(whichNetworkToUse === 'testnet') resultAddress = attemptKeyPair.pub.getAddress(bitcoin.networks.testnet).toBase58Check().toString(); 
+        else resultAddress = attemptKeyPair.pub.getAddress(bitcoin.networks.bitcoin).toBase58Check().toString(); 
+	    if(resultAddress === address){
+        	    child_process.exec((bitcoinCommandPath + 'importprivkey ' + allegedPrivateKey), function(error, stdout, stderr){
+                    if(error) return false;
+                    else return true;
+        	    });
+	        socket.emit('ownOrigin');
+	    } else {
+	        socket.emit('magicText', ('Incorrect private key for ' + address.toString()));
+	    }
     });
 
 
@@ -157,7 +173,7 @@ io.on('connection', function (socket) {
         child_process.exec((bitcoinCommandPath + 'sendrawtransaction ' + 
                                     text), function(error, stdout, stderr){
                 myOutput = stdout;
-                socket.emit('magicText', ("TRANSACTION SENT TO NETWORK: " + text);
+                socket.emit('magicText', ("TRANSACTION SENT TO NETWORK: " + text));
                 });
     });
 
@@ -261,7 +277,16 @@ function getUnspents(address, network, callback) {
         value: r.value
       }
     })
-    callback(null, address, unspents)
+
+    var seen = [], result = [];
+    for(var len = unspents.length, i = len-1; i >= 0; i--){
+        if(!seen[unspents[i]]){
+            seen[unspents[i]] = true;
+            result.push(unspents[i]);
+        }
+    }
+
+    callback(null, address, result)
   })
 }
 

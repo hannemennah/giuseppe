@@ -147,6 +147,22 @@ function updateChangeNode(newAddress, doIOwn, callback){
     callback(false);
 }
 
+//Updates origin node and ensures it is color-filled properly
+function ownOriginNode(callback){
+     var index = idxOfAttr(nodes, 'type', 'origin');
+     if (index > -1) {
+        nodes[index].isMine = true;
+        d3.selectAll("svg").selectAll("circle")
+        .style("fill", function(d) { 
+            if(d.isMine) return color(d.cluster);
+            else if (d.parent > -1 && nodes[d.parent].isMine) return color(nodes[d.parent].cluster);
+            else return "white";
+        });
+        callback(true); return;
+     }
+    callback(false);
+}
+
 //Increase (or decrease) node radius, for visual feedback
 function addToNodeSize(nid, amount){
      amount = parseFloat(amount.toFixed(8));

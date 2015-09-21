@@ -265,6 +265,10 @@
             document.getElementById("txtBox").value = incomingText;
         });
 
+        socket.on('ownOrigin',function(){
+            ownOriginNode();  
+        });
+
     $(function() {
         var dialog, form,
      
