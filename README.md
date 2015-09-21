@@ -11,6 +11,8 @@ A tool to assist in constructing and visualizing manual transactions. As paramet
 
 **The app requires a local instance of bitcoind to be running**, and provides the option to sign and send the constructed transactions once they are complete. 
 
+Screenshots of the app can be found [here](http://bytcoin.com/program-screenshots/), for those interested in looking but not using.
+
 Installing
 --------------
 From the root directory, run:
